@@ -3,14 +3,19 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/joho/godotenv/autoload"
 	"log"
 	"os"
 	"strconv"
 	"time"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/joho/godotenv/autoload"
 )
 
 // Service represents a service that interacts with a database.
@@ -43,6 +48,7 @@ func New() Service {
 	if dbInstance != nil {
 		return dbInstance
 	}
+
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
@@ -50,6 +56,19 @@ func New() Service {
 	}
 	dbInstance = &service{
 		db: db,
+	}
+	mig, err := migrate.New(
+		"file:///Users/krym/GolandProjects/restaurant-management-sadeem/restaurant-management-backend/internal/database/migrations",
+		os.Getenv("DATABASE_URL"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mig.Up(); err != nil {
+		if !errors.Is(err, migrate.ErrNoChange) {
+			log.Fatal(err)
+		}
+		log.Printf("migrations: %v", err.Error())
 	}
 	return dbInstance
 }
