@@ -1,6 +1,8 @@
 # Simple Makefile for a Go project
-
+include .env
+export
 # Build the application
+
 all: build
 
 build:
@@ -14,36 +16,15 @@ run:
 	@go run cmd/api/main.go
 
 
-# Create DB container
-docker-run:
-	@if docker compose up 2>/dev/null; then \
-		: ; \
-	else \
-		echo "Falling back to Docker Compose V1"; \
-		docker-compose up; \
-	fi
-
-# Shutdown DB container
-docker-down:
-	@if docker compose down 2>/dev/null; then \
-		: ; \
-	else \
-		echo "Falling back to Docker Compose V1"; \
-		docker-compose down; \
-	fi
-
-
 # Test the application
 test:
 	@echo "Testing..."
 	@go test ./... -v
 
-
 # Integrations Tests for the application
 itest:
 	@echo "Running integration tests..."
 	@go test ./internal/database -v
-
 
 # Clean the binary
 clean:
@@ -68,5 +49,20 @@ watch:
             fi; \
         fi
 
+migrate.up:
+	migrate -path=$(MIGRATIONS_ROOT) -database $(DATABASE_URL) up $(n)
+migrate.up.all:
+	migrate -path=$(MIGRATIONS_ROOT) -database $(DATABASE_URL) up
+migrate.down:
+	migrate -path=$(MIGRATIONS_ROOT) -database $(DATABASE_URL) down $(n)
+migrate.down.all:
+	migrate -path=$(MIGRATIONS_ROOT) -database $(DATABASE_URL) down -all
+migration:
+	migrate create -seq -ext=.sql -dir=$(MIGRATIONS_ROOT) $(n)
+migrate.force:
+	migrate -path=$(MIGRATIONS_ROOT) -database $(DATABASE_URL) force $(n)
+refresh: migrate.down.all migrate.up seed
 
-.PHONY: all build run test clean watch
+
+
+.PHONY: all build run test clean watch migrate.up migrate.up.all migrate.down migrate.down.all migration migrate.force refresh
