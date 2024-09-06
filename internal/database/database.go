@@ -2,35 +2,35 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/joho/godotenv/autoload"
 	"log"
 	"os"
+	"restaurant-management-backend/internal/types"
 	"strconv"
 	"time"
 )
 
 // Service represents a service that interacts with a database.
 type Service interface {
-	// Health returns a map of health status information.
-	// The keys and values in the map are service-specific.
 	Health() map[string]string
-
-	// Close terminates the database connection.
-	// It returns an error if the connection cannot be closed.
+	GetUserByID(id int) (types.User, error)
+	CreateUser(user types.User) (int, error)
+	UpdateUser(user types.User) error
+	DeleteUser(id int) error
+	ListUsers() ([]types.User, error)
 	Close() error
 }
 
 type service struct {
-	db *sql.DB
+	db *sqlx.DB
 }
 
 var (
@@ -50,7 +50,7 @@ func New() Service {
 	}
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
-	db, err := sql.Open("pgx", connStr)
+	db, err := sqlx.Connect("pgx", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,6 +71,15 @@ func New() Service {
 		log.Printf("migrations: %v", err.Error())
 	}
 	return dbInstance
+}
+
+func (s *service) Close() error {
+	log.Printf("Disconnected from database: %s", database)
+	return s.db.Close()
+}
+
+func (s *service) GetDB() *sqlx.DB {
+	return s.db
 }
 
 // Health checks the health of the database connection by pinging the database.
@@ -122,13 +131,4 @@ func (s *service) Health() map[string]string {
 	}
 
 	return stats
-}
-
-// Close closes the database connection.
-// It logs a message indicating the disconnection from the specific database.
-// If the connection is successfully closed, it returns nil.
-// If an error occurs while closing the connection, it returns the error.
-func (s *service) Close() error {
-	log.Printf("Disconnected from database: %s", database)
-	return s.db.Close()
 }
