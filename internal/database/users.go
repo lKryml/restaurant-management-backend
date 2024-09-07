@@ -2,13 +2,22 @@ package database
 
 import (
 	"fmt"
+	"github.com/Masterminds/squirrel"
 	"restaurant-management-backend/internal/types"
 )
 
+var QB = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
+
 func (s *service) ListUsers() ([]types.User, error) {
 	var users []types.User
-	err := s.db.Select(&users, "SELECT * FROM users")
-	return users, err
+	query, args, err := QB.Select("*").From("users").ToSql()
+	if err != nil {
+		fmt.Errorf("sql query builder failed %w", err)
+	}
+	if err := s.db.Select(&users, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+	return users, nil
 }
 
 func (s *service) GetUserByID(id int) (types.User, error) {

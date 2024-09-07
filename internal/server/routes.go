@@ -14,7 +14,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.Use(middleware.Logger)
 	r.Get("/health", s.healthHandler)
 	r.Get("/users", s.GetUsersHandler)
-	r.Get("/user/{id}", s.IndexUserHandler)
+	//r.Get("/user/{id}", s.IndexUserHandler)
 	r.Post("/user", s.StoreUserHandler)
 	r.Put("/user/{id}", s.UpdateUserHandler)
 	r.Delete("/user/{id}", s.DeleteUserHandler)
@@ -25,33 +25,30 @@ func (s *Server) RegisterRoutes() http.Handler {
 func (s *Server) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := s.db.ListUsers()
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Errorf("InternalServerError %w", err)
 	}
 	WriteJSONResponse(w, 200, users)
 }
 
-func (s *Server) IndexUserHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	resp := make(map[string]string)
-	resp["message"] = "Yo yo user here wass good"
-	resp["userID"] = id
-
-	WriteJSONResponse(w, 200, resp)
-	//writeJSONResponse(w, 200, map[string]string{"message": "Yo yo user here wass good"})
-
-}
+//
+//func (s *Server) IndexUserHandler(w http.ResponseWriter, r *http.Request) {
+//	id := r.PathValue("id")
+//	resp := make(map[string]string)
+//	resp["message"] = "Yo yo user here wass good"
+//	resp["userID"] = id
+//
+//	WriteJSONResponse(w, 200, resp)
+//	//writeJSONResponse(w, 200, map[string]string{"message": "Yo yo user here wass good"})
+//
+//}
 
 func (s *Server) StoreUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := types.User{
-		"",
-		r.FormValue("name"),
-		"",
-		r.FormValue("email"),
-		r.FormValue("phone"),
-		r.FormValue("password"),
-		"",
-		"",
+		Name:     r.FormValue("name"),
+		Email:    r.FormValue("email"),
+		Phone:    r.FormValue("phone"),
+		Password: r.FormValue("password"),
 	}
 
 	id, err := s.db.CreateUser(user)
