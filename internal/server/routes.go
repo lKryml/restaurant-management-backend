@@ -6,7 +6,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 	"restaurant-management-backend/internal/types"
-	"strconv"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -51,13 +50,11 @@ func (s *Server) StoreUserHandler(w http.ResponseWriter, r *http.Request) {
 		Password: r.FormValue("password"),
 	}
 
-	id, err := s.db.CreateUser(user)
-	if err != nil {
-		fmt.Println(err.Error())
+	if err := s.db.CreateUser(user); err != nil {
+		fmt.Errorf("InternalServerError %w", err)
 	}
 	resp := make(map[string]string)
 	resp["message"] = "User stored successfully!"
-	resp["id"] = strconv.Itoa(id)
 	WriteJSONResponse(w, http.StatusCreated, user)
 
 }

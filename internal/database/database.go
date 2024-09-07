@@ -21,8 +21,9 @@ import (
 // Service represents a service that interacts with a database.
 type Service interface {
 	Health() map[string]string
+	GetDB() *sqlx.DB
 	GetUserByID(id int) (types.User, error)
-	CreateUser(user types.User) (int, error)
+	CreateUser(user types.User) error
 	UpdateUser(user types.User) error
 	DeleteUser(id int) error
 	ListUsers() ([]types.User, error)

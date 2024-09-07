@@ -27,8 +27,8 @@ func (s *service) GetUserByID(id int) (types.User, error) {
 	return user, err
 }
 
-func (s *service) CreateUser(user types.User) (int, error) {
-	var id int
+func (s *service) CreateUser(user types.User) (string, error) {
+	var id string
 	_, err := s.db.NamedQuery("INSERT INTO users (name,email,password,phone) VALUES (:name,:email,:password,:phone) RETURNING id", user)
 	fmt.Println(id)
 	return id, err
