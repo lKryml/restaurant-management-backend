@@ -1,6 +1,7 @@
 package database
 
 import (
+	"golang.org/x/crypto/bcrypt"
 	"io"
 	"net/http"
 	"os"
@@ -38,6 +39,13 @@ func SignUpHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid phone number format", http.StatusBadRequest)
 		return
 	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Error hashing password: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	user.Password = string(hashedPassword)
 
 	file, fileHeader, err := r.FormFile("img")
 	if err != nil && err != http.ErrMissingFile {
