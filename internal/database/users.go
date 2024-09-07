@@ -1,6 +1,15 @@
 package database
 
-import "restaurant-management-backend/internal/types"
+import (
+	"fmt"
+	"restaurant-management-backend/internal/types"
+)
+
+func (s *service) ListUsers() ([]types.User, error) {
+	var users []types.User
+	err := s.db.Select(&users, "SELECT * FROM users")
+	return users, err
+}
 
 func (s *service) GetUserByID(id int) (types.User, error) {
 	var user types.User
@@ -9,15 +18,10 @@ func (s *service) GetUserByID(id int) (types.User, error) {
 	return user, err
 }
 
-func (s *service) ListUsers() ([]types.User, error) {
-	var users []types.User
-	err := s.db.Select(&users, "SELECT * FROM users")
-	return users, err
-}
-
 func (s *service) CreateUser(user types.User) (int, error) {
 	var id int
-	err := s.db.QueryRow("INSERT INTO users (name) VALUES ($1) RETURNING id", user.Name).Scan(&id)
+	_, err := s.db.NamedExec("INSERT INTO users (name,email,password,phone) VALUES (:name,:email,:password,:phone) RETURNING id", user)
+	fmt.Println(id)
 	return id, err
 }
 

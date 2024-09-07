@@ -13,7 +13,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/health", s.healthHandler)
-	r.Get("/users", s.GetUsers)
+	r.Get("/users", s.GetUsersHandler)
 	r.Get("/user/{id}", s.IndexUserHandler)
 	r.Post("/user", s.StoreUserHandler)
 	r.Put("/user/{id}", s.UpdateUserHandler)
@@ -22,22 +22,12 @@ func (s *Server) RegisterRoutes() http.Handler {
 	return r
 }
 
-type User struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	Password   string `json:"password"`
-	Created_at string `json:"created_at"`
-	Updated_at string `json:"updated_at"`
-}
-
-func (s *Server) GetUsers(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := s.db.ListUsers()
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	types.WriteJSONResponse(w, 200, users)
+	WriteJSONResponse(w, 200, users)
 }
 
 func (s *Server) IndexUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,26 +36,32 @@ func (s *Server) IndexUserHandler(w http.ResponseWriter, r *http.Request) {
 	resp["message"] = "Yo yo user here wass good"
 	resp["userID"] = id
 
-	types.WriteJSONResponse(w, 200, resp)
+	WriteJSONResponse(w, 200, resp)
 	//writeJSONResponse(w, 200, map[string]string{"message": "Yo yo user here wass good"})
 
 }
 
 func (s *Server) StoreUserHandler(w http.ResponseWriter, r *http.Request) {
-	var user User
-	var err error
-	id := r.FormValue("id")
-	name := r.FormValue("name")
-	user.ID, err = strconv.Atoi(id)
-	if err != nil {
-		types.HandleError(w, http.StatusBadRequest, err.Error())
-		return
+
+	user := types.User{
+		"",
+		r.FormValue("name"),
+		"",
+		r.FormValue("email"),
+		r.FormValue("phone"),
+		r.FormValue("password"),
+		"",
+		"",
 	}
-	user.Name = name
+
+	id, err := s.db.CreateUser(user)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 	resp := make(map[string]string)
 	resp["message"] = "User stored successfully!"
-
-	types.WriteJSONResponse(w, http.StatusCreated, user)
+	resp["id"] = strconv.Itoa(id)
+	WriteJSONResponse(w, http.StatusCreated, user)
 
 }
 
@@ -74,7 +70,7 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	resp := make(map[string]string)
 	resp["message"] = "Updated user successfully!"
 	resp["userID"] = id
-	types.WriteJSONResponse(w, http.StatusCreated, resp)
+	WriteJSONResponse(w, http.StatusCreated, resp)
 
 }
 
@@ -87,11 +83,11 @@ func (s *Server) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	resp := make(map[string]string)
 	resp["message"] = "Deleted user successfully!"
 	resp["userID"] = id
-	types.WriteJSONResponse(w, http.StatusCreated, resp)
+	WriteJSONResponse(w, http.StatusCreated, resp)
 
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	types.WriteJSONResponse(w, 200, s.db.Health())
+	WriteJSONResponse(w, 200, s.db.Health())
 
 }

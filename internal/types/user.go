@@ -1,12 +1,12 @@
 package types
 
 type User struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
+	ID         string `db:"id" json:"id"`
+	Name       string `db:"name" json:"name"`
 	Img        string `db:"img" json:"img"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	Password   string `json:"password"`
-	Created_at string `json:"created_at"`
-	Updated_at string `json:"updated_at"`
+	Email      string `db:"email" json:"email"`
+	Phone      string `db:"phone" json:"phone"`
+	Password   string `db:"password" json:"password"`
+	Created_at string `db:"created_at" json:"created_at"`
+	Updated_at string `db:"updated_at" json:"updated_at"`
 }
