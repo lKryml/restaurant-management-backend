@@ -1,11 +1,10 @@
-CREATE TABLE users(
-    id      uuid not null primary key default gen_random_uuid(),
-    name    varchar(255) not null,
-    img     varchar(255),
-    phone   varchar(255) not null,
-    email   varchar(255) unique not null,
-    password varchar(255) not null,
-    created_at timestamp not null default current_timestamp,
-    updated_at timestamp not null default current_timestamp
-
-)
+CREATE TABLE users (
+    id            uuid NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+    img           VARCHAR(255),
+    name          VARCHAR(255) NOT NULL,
+    phone         VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) UNIQUE NOT NULL,
+    password      VARCHAR(255) NOT NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
