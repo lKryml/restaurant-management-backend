@@ -20,7 +20,7 @@ func (s *service) GetUserByID(id int) (types.User, error) {
 
 func (s *service) CreateUser(user types.User) (int, error) {
 	var id int
-	_, err := s.db.NamedExec("INSERT INTO users (name,email,password,phone) VALUES (:name,:email,:password,:phone) RETURNING id", user)
+	_, err := s.db.NamedQuery("INSERT INTO users (name,email,password,phone) VALUES (:name,:email,:password,:phone) RETURNING id", user)
 	fmt.Println(id)
 	return id, err
 }
