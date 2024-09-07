@@ -1,7 +1,9 @@
 package database
 
 import (
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"restaurant-management-backend/internal/types"
@@ -35,6 +37,41 @@ func SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	if user.Phone != "" && !isValidPhone(user.Phone) {
 		http.Error(w, "Invalid phone number format", http.StatusBadRequest)
 		return
+	}
+
+	file, fileHeader, err := r.FormFile("img")
+	if err != nil && err != http.ErrMissingFile {
+		http.Error(w, "Error retrieving file: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	if file != nil {
+		if !isValidImageType(fileHeader.Filename) {
+			http.Error(w, "Invalid image type. Only PNG, JPG, or GIF allowed", http.StatusBadRequest)
+			return
+		}
+
+		uploadDir := "./uploads/"
+		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
+			os.Mkdir(uploadDir, os.ModePerm)
+		}
+		filePath := filepath.Join(uploadDir, sanitizeFilename(fileHeader.Filename))
+
+		out, err := os.Create(filePath)
+		if err != nil {
+			http.Error(w, "Unable to save the file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer out.Close()
+
+		_, err = io.Copy(out, file)
+		if err != nil {
+			http.Error(w, "Error saving file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		user.Img = &filePath
 	}
 
 	if err := New().CreateUser(user); err != nil {
