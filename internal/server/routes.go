@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
+	"restaurant-management-backend/internal/database"
 	"restaurant-management-backend/internal/types"
 )
 
@@ -14,7 +15,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.Get("/health", s.healthHandler)
 	r.Get("/users", s.GetUsersHandler)
 	//r.Get("/user/{id}", s.IndexUserHandler)
-	r.Post("/user", s.StoreUserHandler)
+	r.Post("/user", database.SignUpHandler)
+
 	r.Put("/user/{id}", s.UpdateUserHandler)
 	r.Delete("/user/{id}", s.DeleteUserHandler)
 
