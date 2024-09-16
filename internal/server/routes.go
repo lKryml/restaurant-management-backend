@@ -5,72 +5,75 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
-	"restaurant-management-backend/internal/database"
-	"restaurant-management-backend/internal/types"
+	"restaurant-management-backend/internal/helpers"
+	"restaurant-management-backend/internal/service"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/health", s.healthHandler)
-	r.Get("/users", s.GetUsersHandler)
-	//r.Get("/user/{id}", s.IndexUserHandler)
-	r.Post("/user", database.SignUpHandler)
-
-	r.Put("/user/{id}", s.UpdateUserHandler)
-	r.Delete("/user/{id}", s.DeleteUserHandler)
+	r.Get("/users", s.indexUsersHandler)
+	r.Get("/user/{id}", s.getUserHandler)
+	r.Post("/user", s.createUserHandler)
+	r.Put("/user/{id}", s.updateUserHandler)
+	r.Delete("/user/{id}", s.deleteUserHandler)
 
 	return r
 }
 
-func (s *Server) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) indexUsersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := s.db.ListUsers()
 	if err != nil {
 		fmt.Errorf("InternalServerError %w", err)
 	}
-	WriteJSONResponse(w, 200, users)
+	helpers.WriteJSONResponse(w, 200, users)
 }
 
-//
-//func (s *Server) IndexUserHandler(w http.ResponseWriter, r *http.Request) {
-//	id := r.PathValue("id")
-//	resp := make(map[string]string)
-//	resp["message"] = "Yo yo user here wass good"
-//	resp["userID"] = id
-//
-//	WriteJSONResponse(w, 200, resp)
-//	//writeJSONResponse(w, 200, map[string]string{"message": "Yo yo user here wass good"})
-//
-//}
-
-func (s *Server) StoreUserHandler(w http.ResponseWriter, r *http.Request) {
-
-	user := types.User{
-		Name:     r.FormValue("name"),
-		Email:    r.FormValue("email"),
-		Phone:    r.FormValue("phone"),
-		Password: r.FormValue("password"),
+func (s *Server) getUserHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		helpers.HandleError(w, http.StatusBadRequest, "id is required")
+	}
+	user, err := s.db.GetUserByID(id)
+	if err != nil {
+		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
 	}
 
-	if err := s.db.CreateUser(user); err != nil {
+	helpers.WriteJSONResponse(w, 200, user)
+
+}
+
+func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
+
+	user, err := service.SignUpHandler(r)
+	if err != nil {
 		fmt.Errorf("InternalServerError %w", err)
 	}
+
+	id, err := s.db.CreateUser(*user)
+	if err != nil {
+		fmt.Errorf("InternalServerError %w", err)
+	}
+	user.ID = id
+
 	resp := make(map[string]string)
-	resp["message"] = "User stored successfully!"
-	WriteJSONResponse(w, http.StatusCreated, user)
+	resp["message"] = "User successfully signed up"
+
+	helpers.WriteJSONResponse(w, http.StatusCreated, user)
 
 }
 
-func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	resp := make(map[string]string)
 	resp["message"] = "Updated user successfully!"
 	resp["userID"] = id
-	WriteJSONResponse(w, http.StatusCreated, resp)
+	helpers.WriteJSONResponse(w, http.StatusCreated, resp)
 
 }
 
-func (s *Server) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	//user := User{
 	//	ID:   id,
@@ -79,11 +82,11 @@ func (s *Server) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	resp := make(map[string]string)
 	resp["message"] = "Deleted user successfully!"
 	resp["userID"] = id
-	WriteJSONResponse(w, http.StatusCreated, resp)
+	helpers.WriteJSONResponse(w, http.StatusCreated, resp)
 
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	WriteJSONResponse(w, 200, s.db.Health())
+	helpers.WriteJSONResponse(w, 200, s.db.Health())
 
 }
