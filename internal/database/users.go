@@ -53,9 +53,6 @@ func (s *service) CreateUser(user types.User) (uuid.UUID, error) {
 	}
 
 	rowsAffected, err := result.RowsAffected()
-	if id == uuid.Nil {
-		return uuid.Nil, fmt.Errorf("couldnt create user / user already exists")
-	}
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("error getting affected rows: %w", err)
 	}
