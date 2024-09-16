@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"github.com/Masterminds/squirrel"
@@ -47,19 +46,16 @@ func (s *service) CreateUser(user types.User) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("error inserting user: %w", err)
 	}
 
-	tx, err := s.db.BeginTxx(context.Background(), nil)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("error starting transaction: %w", err)
-	}
-	defer tx.Rollback()
-
 	fmt.Println(query, args)
-	result, err := tx.Exec(query, args...)
+	result, err := s.db.Exec(query, args...)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("error executing insert query: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
+	if id == uuid.Nil {
+		return uuid.Nil, fmt.Errorf("couldnt create user / user already exists")
+	}
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("error getting affected rows: %w", err)
 	}
@@ -67,14 +63,9 @@ func (s *service) CreateUser(user types.User) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("insert query did not affect any rows")
 	}
 
-	// Get the last inserted ID
-	err = tx.QueryRow("SELECT id FROM users WHERE email = $1", user.Email).Scan(&id)
+	err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email).Scan(&id)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("error getting inserted ID: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return uuid.Nil, fmt.Errorf("error committing transaction: %w", err)
 	}
 	//_, err := s.db.NamedQuery("INSERT INTO users (name,email,password,phone) VALUES (:name,:email,:password,:phone) RETURNING id", user)
 	//fmt.Println(id)
