@@ -53,7 +53,8 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	id, err := s.db.CreateUser(*user)
 	if err != nil {
-		fmt.Errorf("InternalServerError %w", err)
+		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	user.ID = id
 
