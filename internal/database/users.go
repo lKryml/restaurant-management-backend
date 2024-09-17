@@ -2,9 +2,11 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"restaurant-management-backend/internal/types"
 	"strings"
@@ -28,46 +30,77 @@ func (s *service) GetUserByID(id string) (*types.User, error) {
 	user := &types.User{}
 	query, args, err := QB.Select("*").From("users").Where(squirrel.Eq{"id": id}).ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("sql query builder failed %w", err)
+		logrus.WithError(err).Error("Failed to build SQL query")
+		return nil, fmt.Errorf("internal server error")
 	}
 	if err := s.db.Get(user, query, args...); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found: %w", err)
+			logrus.WithField("id", id).Info("User not found")
+			return nil, fmt.Errorf("user not found")
 		}
-		return nil, fmt.Errorf("error fetching user: %w", err)
+		logrus.WithError(err).WithField("id", id).Error("Failed to fetch user from database")
+		return nil, fmt.Errorf("internal server error")
 	}
 	return user, nil
 }
 
-func (s *service) CreateUser(user types.User) (uuid.UUID, error) {
-	var id uuid.UUID
+func (s *service) CreateUser(user types.User) (*types.User, error) {
+	//var (
+	//	id         uuid.UUID
+	//	created_at time.Time
+	//	updated_at time.Time
+	//)
 	query, args, err := InsertTypeSQL(user)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("error inserting user: %w", err)
+		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
-
-	fmt.Println(query, args)
-	result, err := s.db.Exec(query, args...)
+	err = s.db.QueryRowx(query, args...).StructScan(&user)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("error executing insert query: %w", err)
+		//if err != nil {
+		//	return uuid.Nil, fmt.Errorf("error executing insert query: %w", err)
+		//}
+
+		//double check for existing if bypassed the first one from query builder
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return nil, fmt.Errorf("user with this email already exists")
+		}
+
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("error inserting user: insert did not return an id!!! lol")
+		}
+
+		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("error getting affected rows: %w", err)
-	}
-	if rowsAffected == 0 {
-		return uuid.Nil, fmt.Errorf("insert query did not affect any rows")
-	}
+	//if id == uuid.Nil {
+	//	return nil, fmt.Errorf("received nil UUID after insert")
+	//}
 
-	err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email).Scan(&id)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("error getting inserted ID: %w", err)
-	}
-	//_, err := s.db.NamedQuery("INSERT INTO users (name,email,password,phone) VALUES (:name,:email,:password,:phone) RETURNING id", user)
-	//fmt.Println(id)
+	//rowsAffected, err := result.RowsAffected()
+	//if err != nil {
+	//	return uuid.Nil, fmt.Errorf("error getting affected rows: %w", err)
+	//}
+	//if rowsAffected == 0 {
+	//	return uuid.Nil, fmt.Errorf("insert query did not affect any rows")
+	//}
+	//
+	//err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email).Scan(&id)
+	//if err != nil {
+	//	return uuid.Nil, fmt.Errorf("error getting inserted ID: %w", err)
+	//}
 
-	return id, err
+	//createdUser := &types.User{
+	//	ID:         id,
+	//	Name:       user.Name,
+	//	Img:        user.Img,
+	//	Email:      user.Email,
+	//	Phone:      user.Phone,
+	//	Created_at: created_at.Format(time.RFC3339),
+	//	Updated_at: updated_at.Format(time.RFC3339),
+	//}
+
+	return &user, nil
 }
 
 func (s *service) UpdateUser(user types.User) error {
@@ -116,7 +149,8 @@ func InsertTypeSQL(data interface{}) (string, []interface{}, error) {
 
 	insertBuilder := QB.Insert(tableName).
 		Columns(columns...).
-		Values(values...)
+		Values(values...).
+		Suffix("RETURNING *")
 
 	return insertBuilder.ToSql()
 }

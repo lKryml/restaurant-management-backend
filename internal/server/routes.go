@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
@@ -25,7 +24,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 func (s *Server) indexUsersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := s.db.ListUsers()
 	if err != nil {
-		fmt.Errorf("InternalServerError %w", err)
+		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	helpers.WriteJSONResponse(w, 200, users)
 }
@@ -34,10 +34,12 @@ func (s *Server) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		helpers.HandleError(w, http.StatusBadRequest, "id is required")
+		return
 	}
 	user, err := s.db.GetUserByID(id)
 	if err != nil {
 		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	helpers.WriteJSONResponse(w, 200, user)
@@ -48,20 +50,20 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := service.SignUpHandler(r)
 	if err != nil {
-		fmt.Errorf("InternalServerError %w", err)
+		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
-	id, err := s.db.CreateUser(*user)
+	user, err = s.db.CreateUser(*user)
 	if err != nil {
 		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	user.ID = id
 
-	resp := make(map[string]string)
+	resp := make(map[string]interface{})
 	resp["message"] = "User successfully signed up"
-
-	helpers.WriteJSONResponse(w, http.StatusCreated, user)
+	resp["user"] = user
+	helpers.WriteJSONResponse(w, http.StatusCreated, resp)
 
 }
 

@@ -8,7 +8,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/joho/godotenv/autoload"
@@ -24,7 +23,7 @@ type Service interface {
 	Health() map[string]string
 	GetDB() *sqlx.DB
 	GetUserByID(id string) (*types.User, error)
-	CreateUser(user types.User) (uuid.UUID, error)
+	CreateUser(user types.User) (*types.User, error)
 	UpdateUser(user types.User) error
 	DeleteUser(id int) error
 	ListUsers() ([]types.User, error)
