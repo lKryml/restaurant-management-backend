@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/sirupsen/logrus"
 	"reflect"
+	"restaurant-management-backend/internal/helpers"
 	"restaurant-management-backend/internal/types"
 	"strings"
 )
@@ -44,12 +45,13 @@ func (s *service) GetUserByID(id string) (*types.User, error) {
 }
 
 func (s *service) CreateUser(user types.User) (*types.User, error) {
-
+	fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
 	query, args, err := InsertTypeSQL(user)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
-
+	query += fmt.Sprintf(" CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
+	fmt.Println(query)
 	err = s.db.QueryRowx(query, args...).StructScan(&user)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
