@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Masterminds/squirrel"
-	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"reflect"
 	"restaurant-management-backend/internal/types"
@@ -45,60 +44,19 @@ func (s *service) GetUserByID(id string) (*types.User, error) {
 }
 
 func (s *service) CreateUser(user types.User) (*types.User, error) {
-	//var (
-	//	id         uuid.UUID
-	//	created_at time.Time
-	//	updated_at time.Time
-	//)
+
 	query, args, err := InsertTypeSQL(user)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
+
 	err = s.db.QueryRowx(query, args...).StructScan(&user)
 	if err != nil {
-		//if err != nil {
-		//	return uuid.Nil, fmt.Errorf("error executing insert query: %w", err)
-		//}
-
-		//double check for existing if bypassed the first one from query builder
-		var pqErr *pq.Error
-		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-			return nil, fmt.Errorf("user with this email already exists")
-		}
-
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("error inserting user: insert did not return an id!!! lol")
 		}
-
 		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
-
-	//if id == uuid.Nil {
-	//	return nil, fmt.Errorf("received nil UUID after insert")
-	//}
-
-	//rowsAffected, err := result.RowsAffected()
-	//if err != nil {
-	//	return uuid.Nil, fmt.Errorf("error getting affected rows: %w", err)
-	//}
-	//if rowsAffected == 0 {
-	//	return uuid.Nil, fmt.Errorf("insert query did not affect any rows")
-	//}
-	//
-	//err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email).Scan(&id)
-	//if err != nil {
-	//	return uuid.Nil, fmt.Errorf("error getting inserted ID: %w", err)
-	//}
-
-	//createdUser := &types.User{
-	//	ID:         id,
-	//	Name:       user.Name,
-	//	Img:        user.Img,
-	//	Email:      user.Email,
-	//	Phone:      user.Phone,
-	//	Created_at: created_at.Format(time.RFC3339),
-	//	Updated_at: updated_at.Format(time.RFC3339),
-	//}
 
 	return &user, nil
 }
