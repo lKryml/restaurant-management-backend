@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Masterminds/squirrel"
-	"github.com/sirupsen/logrus"
 	"reflect"
-	"restaurant-management-backend/internal/helpers"
+	"restaurant-management-backend/internal/logger"
 	"restaurant-management-backend/internal/types"
 	"strings"
 )
@@ -30,28 +29,28 @@ func (s *service) GetUserByID(id string) (*types.User, error) {
 	user := &types.User{}
 	query, args, err := QB.Select("*").From("users").Where(squirrel.Eq{"id": id}).ToSql()
 	if err != nil {
-		logrus.WithError(err).Error("Failed to build SQL query")
+		logger.Log.WithError(err).Error("Failed to build SQL query")
 		return nil, fmt.Errorf("internal server error")
 	}
 	if err := s.db.Get(user, query, args...); err != nil {
 		if err == sql.ErrNoRows {
-			logrus.WithField("id", id).Info("User not found")
+			logger.Log.WithField("id", id).Info("User not found")
 			return nil, fmt.Errorf("user not found")
 		}
-		logrus.WithError(err).WithField("id", id).Error("Failed to fetch user from database")
+		logger.Log.WithError(err).WithField("id", id).Error("Failed to fetch user from database")
 		return nil, fmt.Errorf("internal server error")
 	}
 	return user, nil
 }
 
 func (s *service) CreateUser(user types.User) (*types.User, error) {
-	fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
+	//fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
 	query, args, err := InsertTypeSQL(user)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
-	query += fmt.Sprintf(" CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
-	fmt.Println(query)
+	//query += fmt.Sprintf(" CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
+	//fmt.Println(query)
 	err = s.db.QueryRowx(query, args...).StructScan(&user)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -73,7 +72,7 @@ func (s *service) DeleteUser(id int) error {
 	return err
 }
 
-func InsertTypeSQL(data interface{}) (string, []interface{}, error) {
+func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, error) {
 	v := reflect.ValueOf(data)
 	t := v.Type()
 
@@ -107,10 +106,18 @@ func InsertTypeSQL(data interface{}) (string, []interface{}, error) {
 		return "", nil, fmt.Errorf("struct is empty")
 	}
 
-	insertBuilder := QB.Insert(tableName).
-		Columns(columns...).
-		Values(values...).
-		Suffix("RETURNING *")
+	var insertBuilder squirrel.InsertBuilder
+	if len(suffix) > 0 {
+		insertBuilder = QB.Insert(tableName).
+			Columns(columns...).
+			Values(values...).
+			Suffix(suffix[0])
+	} else {
+		insertBuilder = QB.Insert(tableName).
+			Columns(columns...).
+			Values(values...).
+			Suffix("RETURNING *")
+	}
 
 	return insertBuilder.ToSql()
 }
