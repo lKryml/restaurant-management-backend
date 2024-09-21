@@ -9,7 +9,7 @@ import (
 
 func SignUpHandler(r *http.Request) (*types.User, error) {
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		return nil, fmt.Errorf("unable to parse form: %w", err)
+		return nil, fmt.Errorf("unable to parse form file size too large: %w", err)
 	}
 
 	user := &types.User{
@@ -37,7 +37,7 @@ func SignUpHandler(r *http.Request) (*types.User, error) {
 	}
 	user.Password = hashedPassword
 
-	filePath, err := helpers.HandleFileUpload(r)
+	filePath, err := helpers.HandleFileUpload(r, "users")
 	if err != nil {
 		return nil, fmt.Errorf("failed to handle file upload: %w", err)
 	}

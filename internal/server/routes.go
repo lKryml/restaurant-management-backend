@@ -4,13 +4,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
+	"os"
+	"path/filepath"
 	"restaurant-management-backend/internal/helpers"
 	"restaurant-management-backend/internal/service"
+	"strings"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Get("/uploads/*", s.serveFiles)
 	r.Get("/health", s.healthHandler)
 	r.Get("/users", s.indexUsersHandler)
 	r.Get("/user/{id}", s.getUserHandler)
@@ -87,6 +91,17 @@ func (s *Server) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	resp["userID"] = id
 	helpers.WriteJSONResponse(w, http.StatusCreated, resp)
 
+}
+
+func (s *Server) serveFiles(w http.ResponseWriter, r *http.Request) {
+	filePath := strings.TrimPrefix(r.URL.Path, "/uploads/")
+	fullPath := filepath.Join("./uploads", filePath)
+
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		helpers.HandleError(w, http.StatusNotFound, "File not found")
+		return
+	}
+	http.ServeFile(w, r, fullPath)
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {

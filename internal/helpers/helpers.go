@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"io"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 )
 
 var Domain = os.Getenv("DOMAIN")
@@ -29,11 +29,12 @@ func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) 
 	_, _ = w.Write(jsonResp)
 }
 
-func HandleFileUpload(r *http.Request) (*string, error) {
+func HandleFileUpload(r *http.Request, table string) (*string, error) {
 	file, fileHeader, err := r.FormFile("img")
 	if err != nil && !errors.Is(err, http.ErrMissingFile) {
-		return nil, fmt.Errorf("error retrieving file: %w", err)
+		return nil, fmt.Errorf("error retrieving file: %w \n %w", err, http.ErrMissingFile)
 	}
+
 	if file == nil {
 		return nil, nil
 	}
@@ -48,7 +49,7 @@ func HandleFileUpload(r *http.Request) (*string, error) {
 		return nil, fmt.Errorf("Invalid file name")
 	}
 
-	uploadDir := "./uploads/"
+	uploadDir := fmt.Sprintf("./uploads/%s", table)
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("Unable to create upload directory: %w", err)
 	}
@@ -64,6 +65,7 @@ func HandleFileUpload(r *http.Request) (*string, error) {
 	if _, err = io.Copy(out, file); err != nil {
 		return nil, fmt.Errorf("Error saving file: %w", err)
 	}
+	//saveFileMetadata(fileUUID, handler.Filename, filePath)
 
 	return &filePath, nil
 }
@@ -99,9 +101,9 @@ func SanitizeFilename(filename string) string {
 
 func GenerateUniqueFilename(filename string) string {
 	ext := filepath.Ext(filename)
-	name := filename[:len(filename)-len(ext)]
-	timestamp := time.Now().UnixNano()
-	return fmt.Sprintf("%s_%d%s", name, timestamp, ext)
+	name := uuid.New()
+	fmt.Println(fmt.Sprintf("%s%s", name, ext))
+	return fmt.Sprintf("%s%s", name, ext)
 }
 
 func GenerateHashedPassword(password string) (string, error) {
