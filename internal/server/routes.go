@@ -82,10 +82,11 @@ func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	//user := User{
-	//	ID:   id,
-	//	Name: "Jiji",
-	//}
+	err := s.db.DeleteUser(id)
+	if err != nil {
+		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	resp := make(map[string]string)
 	resp["message"] = "Deleted user successfully!"
 	resp["userID"] = id

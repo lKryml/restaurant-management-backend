@@ -25,7 +25,7 @@ type Service interface {
 	GetUserByID(id string) (*types.User, error)
 	CreateUser(user types.User) (*types.User, error)
 	UpdateUser(user types.User) error
-	DeleteUser(id int) error
+	DeleteUser(id string) error
 	ListUsers() ([]types.User, error)
 	Close() error
 }

@@ -52,8 +52,7 @@ func (s *service) CreateUser(user types.User) (*types.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
-	//query += fmt.Sprintf(" CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
-	//fmt.Println(query)
+
 	err = s.db.QueryRowx(query, args...).StructScan(&user)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -72,9 +71,12 @@ func (s *service) UpdateUser(user types.User) error {
 	return err
 }
 
-func (s *service) DeleteUser(id int) error {
-	_, err := s.db.Exec("DELETE FROM users WHERE id = $1", id)
-	return err
+func (s *service) DeleteUser(id string) error {
+	err := deleteById(id, s)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, error) {
@@ -124,4 +126,23 @@ func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, e
 	}
 
 	return insertBuilder.ToSql()
+}
+
+func deleteById(id string, s *service) error {
+	query, args, err := QB.Delete("users").Where(squirrel.Eq{"id": id}).ToSql()
+	if err != nil {
+		return fmt.Errorf("error deleting user failed building sql query: %w", err)
+	}
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("error deleting user failed sql exec: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error deleting user failed to fetch rows affected:%w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("error deleting user: no rows affected")
+	}
+	return nil
 }
