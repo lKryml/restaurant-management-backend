@@ -113,3 +113,10 @@ func GenerateHashedPassword(password string) (string, error) {
 	}
 	return string(hashedPassword), nil
 }
+
+func DeleteFile(filePath string) error {
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error failed to delete file : %w", err)
+	}
+	return nil
+}

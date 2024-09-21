@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
-	"os"
 	"reflect"
 	"restaurant-management-backend/internal/helpers"
 	"restaurant-management-backend/internal/logger"
@@ -73,26 +72,54 @@ func (s *service) UpdateUser(user types.User) error {
 }
 
 func (s *service) DeleteUser(id string) error {
-	return deleteById(id, s, func(userId string) error {
-		var imagePath string
-		query, args, err := QB.Select("img").From("users").Where(squirrel.Eq{"id": userId}).ToSql()
+	result, err := deleteById(s, id, "users", "RETURNING img")
+	if err != nil {
+		return fmt.Errorf("error deleting user: %w", err)
+	}
+	if result != nil {
+		err = helpers.DeleteFile(*result)
 		if err != nil {
-			return fmt.Errorf("error deleting user sql query builder failed: %w", err)
+			return fmt.Errorf("error deleting user: %w", err)
 		}
-		err = s.db.QueryRowx(query, args...).Scan(&imagePath)
+	}
+	return nil
+}
+
+func deleteById(s *service, id string, table string, suffix ...string) (*string, error) {
+
+	var data *string
+	var deleteBuilder squirrel.DeleteBuilder
+	if len(suffix) > 0 {
+		deleteBuilder = QB.Delete(table).Where(squirrel.Eq{"id": id}).Suffix(suffix[0])
+	} else {
+		deleteBuilder = QB.Delete(table).Where(squirrel.Eq{"id": id})
+	}
+	query, args, err := deleteBuilder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("error deleting user failed building sql query: %w", err)
+	}
+	if len(suffix) > 0 {
+		err = s.db.QueryRowx(query, args...).Scan(&data)
 		if err != nil {
-			return nil
+			return nil, fmt.Errorf("error deleting user failed query: %w", err)
+		}
+		return data, nil
+
+	} else {
+		result, err := s.db.Exec(query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("error deleting user failed sql exec: %w", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("error deleting user failed to fetch rows affected:%w", err)
+		}
+		if affected == 0 {
+			return nil, fmt.Errorf("error deleting user: no rows affected")
 		}
 
-		if imagePath != "" {
-			fmt.Println(imagePath)
-			if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("error deleting user failed to delete image: %w", err)
-			}
-		}
-
-		return nil
-	})
+	}
+	return nil, nil
 }
 
 func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, error) {
@@ -142,30 +169,4 @@ func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, e
 	}
 
 	return insertBuilder.ToSql()
-}
-
-func deleteById(id string, s *service, beforeDelete func(id string) error) error {
-
-	if beforeDelete != nil {
-		if err := beforeDelete(id); err != nil {
-			return fmt.Errorf("CALLBACK ERR: %w", err)
-		}
-	}
-
-	query, args, err := QB.Delete("users").Where(squirrel.Eq{"id": id}).Suffix("RETURNING img").ToSql()
-	if err != nil {
-		return fmt.Errorf("error deleting user failed building sql query: %w", err)
-	}
-	result, err := s.db.Exec(query, args...)
-	if err != nil {
-		return fmt.Errorf("error deleting user failed sql exec: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error deleting user failed to fetch rows affected:%w", err)
-	}
-	if affected == 0 {
-		return fmt.Errorf("error deleting user: no rows affected")
-	}
-	return nil
 }
