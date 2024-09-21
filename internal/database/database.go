@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Masterminds/squirrel"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -13,8 +14,10 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	"log"
 	"os"
+	"reflect"
 	"restaurant-management-backend/internal/types"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -132,4 +135,90 @@ func (s *service) Health() map[string]string {
 	}
 
 	return stats
+}
+
+func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, error) {
+	v := reflect.ValueOf(data)
+	t := v.Type()
+
+	if t.Kind() == reflect.Ptr {
+		v = v.Elem()
+		t = v.Type()
+	}
+
+	if t.Kind() != reflect.Struct {
+		return "", nil, fmt.Errorf("data must be a struct")
+	}
+
+	// add s to type name user = users, vendor = vendors
+	tableName := strings.ToLower(t.Name()) + "s"
+
+	columns := []string{}
+	values := []interface{}{}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		dbTag := field.Tag.Get("db")
+		if dbTag != "" {
+			if !v.Field(i).IsZero() {
+				columns = append(columns, dbTag)
+				values = append(values, v.Field(i).Interface())
+			}
+		}
+	}
+
+	if len(columns) == 0 {
+		return "", nil, fmt.Errorf("struct is empty")
+	}
+
+	var insertBuilder squirrel.InsertBuilder
+	if len(suffix) > 0 {
+		insertBuilder = QB.Insert(tableName).
+			Columns(columns...).
+			Values(values...).
+			Suffix(suffix[0])
+	} else {
+		insertBuilder = QB.Insert(tableName).
+			Columns(columns...).
+			Values(values...)
+	}
+
+	return insertBuilder.ToSql()
+}
+
+func deleteById(s *service, id string, table string, suffix ...string) (*string, error) {
+
+	var data *string
+	var deleteBuilder squirrel.DeleteBuilder
+	if len(suffix) > 0 {
+		deleteBuilder = QB.Delete(table).Where(squirrel.Eq{"id": id}).Suffix(suffix[0])
+	} else {
+		deleteBuilder = QB.Delete(table).Where(squirrel.Eq{"id": id})
+	}
+	query, args, err := deleteBuilder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("error deleting user failed building sql query: %w", err)
+	}
+	if len(suffix) > 0 {
+		err = s.db.QueryRowx(query, args...).Scan(&data)
+		if err != nil {
+			return nil, fmt.Errorf("error deleting user failed query: %w", err)
+		}
+		return data, nil
+
+	} else {
+		result, err := s.db.Exec(query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("error deleting user failed sql exec: %w", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("error deleting user failed to fetch rows affected:%w", err)
+		}
+		if affected == 0 {
+			return nil, fmt.Errorf("error deleting user: no rows affected")
+		}
+
+	}
+	return nil, nil
 }
