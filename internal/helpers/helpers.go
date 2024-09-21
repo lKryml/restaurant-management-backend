@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"io"
@@ -30,8 +31,8 @@ func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) 
 
 func HandleFileUpload(r *http.Request) (*string, error) {
 	file, fileHeader, err := r.FormFile("img")
-	if err != nil && err != http.ErrMissingFile {
-		return nil, fmt.Errorf("Error retrieving file: %w", err)
+	if err != nil && !errors.Is(err, http.ErrMissingFile) {
+		return nil, fmt.Errorf("error retrieving file: %w", err)
 	}
 	if file == nil {
 		return nil, nil
@@ -106,7 +107,7 @@ func GenerateUniqueFilename(filename string) string {
 func GenerateHashedPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", fmt.Errorf("Error hashing password: %w", err)
+		return "", fmt.Errorf("error hashing password: %w", err)
 	}
 	return string(hashedPassword), nil
 }
