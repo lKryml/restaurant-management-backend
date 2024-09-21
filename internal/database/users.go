@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"os"
 	"reflect"
 	"restaurant-management-backend/internal/helpers"
 	"restaurant-management-backend/internal/logger"
@@ -72,11 +73,26 @@ func (s *service) UpdateUser(user types.User) error {
 }
 
 func (s *service) DeleteUser(id string) error {
-	err := deleteById(id, s)
-	if err != nil {
-		return err
-	}
-	return nil
+	return deleteById(id, s, func(userId string) error {
+		var imagePath string
+		query, args, err := QB.Select("img").From("users").Where(squirrel.Eq{"id": userId}).ToSql()
+		if err != nil {
+			return fmt.Errorf("error deleting user sql query builder failed: %w", err)
+		}
+		err = s.db.QueryRowx(query, args...).Scan(&imagePath)
+		if err != nil {
+			return nil
+		}
+
+		if imagePath != "" {
+			fmt.Println(imagePath)
+			if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("error deleting user failed to delete image: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, error) {
@@ -128,8 +144,15 @@ func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, e
 	return insertBuilder.ToSql()
 }
 
-func deleteById(id string, s *service) error {
-	query, args, err := QB.Delete("users").Where(squirrel.Eq{"id": id}).ToSql()
+func deleteById(id string, s *service, beforeDelete func(id string) error) error {
+
+	if beforeDelete != nil {
+		if err := beforeDelete(id); err != nil {
+			return fmt.Errorf("CALLBACK ERR: %w", err)
+		}
+	}
+
+	query, args, err := QB.Delete("users").Where(squirrel.Eq{"id": id}).Suffix("RETURNING img").ToSql()
 	if err != nil {
 		return fmt.Errorf("error deleting user failed building sql query: %w", err)
 	}
