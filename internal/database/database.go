@@ -27,7 +27,7 @@ type Service interface {
 	GetDB() *sqlx.DB
 	GetUserByID(id string) (*types.User, error)
 	CreateUser(user types.User) (*types.User, error)
-	UpdateUser(user types.User) error
+	UpdateUser(user types.User, id string) (*types.User, error)
 	DeleteUser(id string) error
 	ListUsers() ([]types.User, error)
 	Close() error
@@ -137,7 +137,55 @@ func (s *service) Health() map[string]string {
 	return stats
 }
 
-func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, error) {
+func UpdateBUILDER(data interface{}, id string, suffix ...string) (string, []interface{}, error) {
+	v := reflect.ValueOf(data)
+	t := v.Type()
+
+	if t.Kind() == reflect.Ptr {
+		v = v.Elem()
+		t = v.Type()
+	}
+
+	if t.Kind() != reflect.Struct {
+		return "", nil, fmt.Errorf("data must be a struct")
+	}
+
+	// add s to type name user = users, vendor = vendors
+	tableName := strings.ToLower(t.Name()) + "s"
+
+	columns := []string{}
+	values := []interface{}{}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		dbTag := field.Tag.Get("db")
+		if dbTag != "" {
+			if !v.Field(i).IsZero() {
+				columns = append(columns, dbTag)
+				values = append(values, v.Field(i).Interface())
+			}
+		}
+	}
+
+	if len(columns) == 0 {
+		return "", nil, fmt.Errorf("struct is empty")
+	}
+
+	updateBuilder := QB.Update(tableName).Where(squirrel.Eq{"id": id})
+
+	for i := 0; i < len(columns); i++ {
+		updateBuilder = updateBuilder.Set(columns[i], values[i])
+	}
+
+	if len(suffix) > 0 {
+		updateBuilder = updateBuilder.Suffix(suffix[0])
+	}
+
+	return updateBuilder.ToSql()
+
+}
+
+func InsertBUILDER(data interface{}, suffix ...string) (string, []interface{}, error) {
 	v := reflect.ValueOf(data)
 	t := v.Type()
 
@@ -182,7 +230,6 @@ func InsertTypeSQL(data interface{}, suffix ...string) (string, []interface{}, e
 			Columns(columns...).
 			Values(values...)
 	}
-
 	return insertBuilder.ToSql()
 }
 

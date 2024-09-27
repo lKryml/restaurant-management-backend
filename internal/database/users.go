@@ -44,9 +44,8 @@ func (s *service) GetUserByID(id string) (*types.User, error) {
 }
 
 func (s *service) CreateUser(user types.User) (*types.User, error) {
-	imgFRM := fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", helpers.Domain)
 
-	query, args, err := InsertTypeSQL(user, fmt.Sprintf("RETURNING id,%s,created_at,updated_at", imgFRM))
+	query, args, err := InsertBUILDER(user, fmt.Sprintf("RETURNING id,%s,created_at,updated_at", helpers.ImageFormat))
 	if err != nil {
 		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
@@ -64,9 +63,24 @@ func (s *service) CreateUser(user types.User) (*types.User, error) {
 	return &user, nil
 }
 
-func (s *service) UpdateUser(user types.User) error {
-	_, err := s.db.Exec("UPDATE users SET name = $1 WHERE id = $2", user.Name, user.ID)
-	return err
+func (s *service) UpdateUser(user types.User, id string) (*types.User, error) {
+	query, args, err := UpdateBUILDER(user, id, "RETURNING *")
+	if err != nil {
+		return nil, fmt.Errorf("error updating user: %w", err)
+	}
+
+	err = s.db.QueryRowx(query, args...).StructScan(&user)
+	if err != nil {
+		return nil, fmt.Errorf("error updating user: %w", err)
+	}
+
+	if *user.Img != "" {
+		if err = helpers.DeleteFile(*user.Img); err != nil {
+			return nil, fmt.Errorf("error updating user: %w", err)
+		}
+	}
+	fmt.Println(user)
+	return &user, nil
 }
 
 func (s *service) DeleteUser(id string) error {

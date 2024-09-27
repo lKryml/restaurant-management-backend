@@ -15,6 +15,7 @@ import (
 )
 
 var Domain = os.Getenv("DOMAIN")
+var ImageFormat = fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", Domain)
 
 func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")

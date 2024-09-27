@@ -73,9 +73,27 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	resp := make(map[string]string)
+	if id == "" {
+		helpers.HandleError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	stuff2update, err := service.UserValidator(r)
+	if err != nil {
+		helpers.HandleError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := s.db.UpdateUser(*stuff2update, id)
+	if err != nil {
+		helpers.HandleError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	resp := make(map[string]interface{})
 	resp["message"] = "Updated user successfully!"
 	resp["userID"] = id
+	resp["user"] = user
 	helpers.WriteJSONResponse(w, http.StatusCreated, resp)
 
 }
