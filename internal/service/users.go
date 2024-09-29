@@ -34,18 +34,8 @@ func UserValidator(r *http.Request) (*types.User, error) {
 
 }
 func SignUpHandler(r *http.Request) (*types.User, error) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		return nil, fmt.Errorf("unable to parse form file size too large: %w", err)
-	}
-
-	user := &types.User{
-		Name:     r.FormValue("name"),
-		Phone:    r.FormValue("phone"),
-		Email:    r.FormValue("email"),
-		Password: r.FormValue("password"),
-	}
-
-	if err := UserVerifyRequired(*user); err != nil {
+	user, err := UserValidator(r)
+	if err != nil {
 		return nil, err
 	}
 
@@ -55,13 +45,6 @@ func SignUpHandler(r *http.Request) (*types.User, error) {
 	}
 	user.Password = hashedPassword
 
-	filePath, err := helpers.HandleFileUpload(r, "users")
-	if err != nil {
-		return nil, fmt.Errorf("failed to handle file upload: %w", err)
-	}
-	if filePath != nil {
-		user.Img = filePath
-	}
 	return user, nil
 }
 

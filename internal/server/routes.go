@@ -73,6 +73,7 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+
 	if id == "" {
 		helpers.HandleError(w, http.StatusBadRequest, "id is required")
 		return

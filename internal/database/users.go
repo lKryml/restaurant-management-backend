@@ -62,25 +62,36 @@ func (s *service) CreateUser(user types.User) (*types.User, error) {
 	}
 	return &user, nil
 }
+func (s *service) UpdateUser(newUser types.User, id string) (*types.User, error) {
+	existingUser, err := s.GetUserByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching existing user: %w", err)
+	}
 
-func (s *service) UpdateUser(user types.User, id string) (*types.User, error) {
-	query, args, err := UpdateBUILDER(user, id, "RETURNING *")
+	var oldImage string
+	if existingUser.Img != nil {
+		oldImage = *existingUser.Img
+	}
+
+	query, args, err := UpdateBUILDER(newUser, id, "RETURNING *, "+helpers.ImageFormat)
+	if err != nil {
+		return nil, fmt.Errorf("error building update query: %w", err)
+	}
+	fmt.Println(query)
+	var updatedUser types.User
+	err = s.db.QueryRowx(query, args...).StructScan(&updatedUser)
 	if err != nil {
 		return nil, fmt.Errorf("error updating user: %w", err)
 	}
-
-	err = s.db.QueryRowx(query, args...).StructScan(&user)
-	if err != nil {
-		return nil, fmt.Errorf("error updating user: %w", err)
-	}
-
-	if *user.Img != "" {
-		if err = helpers.DeleteFile(*user.Img); err != nil {
-			return nil, fmt.Errorf("error updating user: %w", err)
+	if newUser.Img != nil && *newUser.Img != oldImage {
+		if oldImage != "" {
+			if err = helpers.DeleteFile(oldImage); err != nil {
+				logger.Log.WithError(err).Error("Failed to delete old user image")
+			}
 		}
 	}
-	fmt.Println(user)
-	return &user, nil
+
+	return &updatedUser, nil
 }
 
 func (s *service) DeleteUser(id string) error {
