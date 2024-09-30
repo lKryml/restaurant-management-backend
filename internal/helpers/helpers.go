@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"io"
@@ -12,10 +13,14 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 )
 
-var Domain = os.Getenv("DOMAIN")
-var ImageFormat = fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", Domain)
+var (
+	Domain      = os.Getenv("DOMAIN")
+	ImageFormat = fmt.Sprintf("CASE WHEN NULLIF(img,'') IS NOT NULL THEN FORMAT ('%s/%%s',img) ELSE NULL END AS img ", Domain)
+	secretKey   = []byte(os.Getenv("JWT_SECRET"))
+)
 
 func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -23,7 +28,7 @@ func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) 
 
 	jsonResp, err := json.Marshal(data)
 	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
+		log.Fatalf("error handling JSON response. Err: %v", err)
 		return
 	}
 
@@ -73,7 +78,6 @@ func HandleFileUpload(r *http.Request, table string) (*string, error) {
 
 func HandleError(w http.ResponseWriter, status int, message string) {
 	WriteJSONResponse(w, status, map[string]string{"error": message})
-
 }
 
 func CheckValidEmail(email string) bool {
@@ -120,4 +124,57 @@ func DeleteFile(filePath string) error {
 		return fmt.Errorf("error failed to delete file : %w", err)
 	}
 	return nil
+}
+
+type TokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+type CustomClaims struct {
+	UserID string `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+func GenerateJWT(userID uuid.UUID) (TokenResponse, error) {
+	claims := CustomClaims{
+		UserID: userID.String(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	signedString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secretKey)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	tokenResponse := TokenResponse{
+		Token:     signedString,
+		ExpiresAt: fmt.Sprintf("%dh", 24),
+	}
+
+	return tokenResponse, nil
+}
+
+func ParseJWT(tokenString string) (uuid.UUID, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return secretKey, nil
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	claims, ok := token.Claims.(*CustomClaims)
+	if !ok || !token.Valid {
+		return uuid.Nil, errors.New("invalid token")
+	}
+
+	userID, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return userID, nil
 }
