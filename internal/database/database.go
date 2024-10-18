@@ -13,6 +13,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/joho/godotenv/autoload"
 	"log"
+	"net/url"
 	"os"
 	"reflect"
 	"restaurant-management-backend/internal/types"
@@ -268,4 +269,112 @@ func deleteById(s *service, id string, table string, suffix ...string) (*string,
 
 	}
 	return nil, nil
+}
+
+func (s *service) BuildQuery(dest interface{}, table string,
+	joins []string, columns []string,
+	searchCols []string, queryParams url.Values,
+	additionalFilters []string) (*types.Meta, error) {
+
+	q := queryParams.Get("q")
+	filters := queryParams.Get("filters")
+	sort := queryParams.Get("sort")
+	page, _ := strconv.Atoi(queryParams.Get("page"))
+	perPage, _ := strconv.Atoi(queryParams.Get("per_page"))
+
+	sb := squirrel.Select().PlaceholderFormat(squirrel.Dollar).From(table)
+
+	for _, join := range joins {
+		sb = sb.LeftJoin(join)
+	}
+
+	if q != "" {
+		orConditions := squirrel.Or{}
+		for _, col := range searchCols {
+			orConditions = append(orConditions, squirrel.ILike{col: "%" + q + "%"})
+		}
+		sb = sb.Where(orConditions)
+	}
+
+	if filters != "" {
+		pairs := strings.Split(filters, ",")
+		for _, pair := range pairs {
+			parts := strings.Split(pair, ":")
+			if len(parts) == 2 {
+				sb = sb.Where(squirrel.Eq{parts[0]: parts[1]})
+			}
+		}
+	}
+
+	for _, filter := range additionalFilters {
+		sb = sb.Where(filter)
+	}
+
+	countSb := sb.Column("COUNT(*)")
+
+	countSQL, countArgs, err := countSb.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	var total int
+	if err := s.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, err
+	}
+
+	sb = sb.Columns(columns...)
+
+	// Add sorting based on the sort parameter
+	if sort != "" {
+		if strings.HasPrefix(sort, "-") {
+			// Descending order
+			sb = sb.OrderBy(strings.TrimPrefix(sort, "-") + " DESC")
+		} else {
+			// Ascending order
+			sb = sb.OrderBy(sort + " ASC")
+		}
+	}
+
+	var offset, lastPage, from, to int
+	if page > 0 && perPage > 0 {
+		offset = (page - 1) * perPage
+		sb = sb.Limit(uint64(perPage)).Offset(uint64(offset))
+
+		// Calculate pagination metadata
+		lastPage = (total + perPage - 1) / perPage
+		from = offset + 1
+		to = offset + perPage
+		if to > total {
+			to = total
+		}
+	} else {
+		perPage = total
+		page = 1
+		lastPage = 1
+		from = 1
+		to = total
+	}
+
+	// Generate the SQL query and arguments
+	sql, args, err := sb.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	// Execute the query with arguments
+	if err := s.db.Select(dest, sql, args...); err != nil {
+		return nil, err
+	}
+
+	meta := types.Meta{
+		Total:       total,
+		PerPage:     perPage,
+		CurrentPage: page,
+		FirstPage:   1,
+		LastPage:    lastPage,
+		From:        from,
+		To:          to,
+	}
+
+	return &meta, nil
 }

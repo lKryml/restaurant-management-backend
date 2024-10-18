@@ -12,3 +12,13 @@ type User struct {
 	Created_at string    `db:"created_at" json:"created_at,omitempty"`
 	Updated_at string    `db:"updated_at" json:"updated_at,omitempty"`
 }
+
+type Meta struct {
+	Total       int `json:"total"`
+	PerPage     int `json:"per_page"`
+	CurrentPage int `json:"current_page"`
+	FirstPage   int `json:"first_page"`
+	LastPage    int `json:"last_page"`
+	From        int `json:"from"`
+	To          int `json:"to"`
+}
