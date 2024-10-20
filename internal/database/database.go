@@ -9,10 +9,12 @@ import (
 	_ "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/joho/godotenv/autoload"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"reflect"
@@ -26,11 +28,69 @@ import (
 type Service interface {
 	Health() map[string]string
 	GetDB() *sqlx.DB
+
+	GrantDefaultRole(userID uuid.UUID) error
+	GetUserByEmail(email string) (*types.User, error)
+
 	GetUserByID(id string) (*types.User, error)
 	CreateUser(user types.User) (*types.User, error)
 	UpdateUser(user types.User, id string) (*types.User, error)
 	DeleteUser(id string) error
 	ListUsers() ([]types.User, error)
+	GetRoles(user *types.User) error
+
+	ListVendors(queryParams url.Values) ([]types.Vendor, *types.Meta, error)
+	GetVendorByID(id string) (*types.Vendor, error)
+	CreateVendor(vendor types.Vendor) (*types.Vendor, error)
+	UpdateVendor(newVendor types.Vendor, id string) (*types.Vendor, error)
+	DeleteVendor(id string) error
+	GrantAdmin(userID, vendorID string) error
+	RevokeAdmin(userID, vendorID string) error
+	ListVendorAdmins(vendorID string) ([]types.User, error)
+
+	FetchRoles(queryParams map[string][]string) ([]types.Role, *types.Meta, error)
+	FetchRole(id string) (types.Role, error)
+	GrantRole(userID, roleID string) error
+	RevokeRole(userID, roleID string) (int64, error)
+	VerifyRoleExists(roleID string) error
+
+	UpdateOrderStatus(id, status string) error
+	AttachOrderItems(order *types.Order) error
+	FetchOrder(id string) (types.Order, error)
+	EnrichOrdersWithItems(orders []types.Order) error
+	FetchOrders(queryParams map[string][]string) ([]types.Order, types.Meta, error)
+
+	ListItems(query map[string][]string) ([]types.Item, *types.Meta, error)
+	CreateItem(item types.Item, r *http.Request) (*types.Item, error)
+	GetItemByID(id string) (*types.Item, error)
+	DeleteItem(id string) error
+	UpdateItem(id string, updates map[string]interface{}, r *http.Request) (*types.Item, error)
+
+	DeleteTable(id string) error
+	UpdateTable(table *types.Table) error
+	UpdateTableFromForm(table *types.Table, r *http.Request) error
+	InsertTable(table *types.Table) error
+	ParseTableFromForm(r *http.Request) (types.Table, error)
+	GetTableByID(id string) (types.Table, error)
+	FetchTables(queryParams url.Values) ([]types.Table, *types.Meta, error)
+
+	GetCart(userID string) (types.Cart, error)
+	GetCartItems(cartID uuid.UUID) ([]types.CartItems, error)
+	GetCartItem(itemID uuid.UUID) (types.Item, error)
+	GetOrCreateCart(userID string, vendorID uuid.UUID) (types.Cart, error)
+	CreateCart(userID string, vendorID uuid.UUID) (types.Cart, error)
+	ResetCart(cartID uuid.UUID, vendorID uuid.UUID) (types.Cart, error)
+	ClearCartItems(cartID uuid.UUID) error
+	UpdateCartItem(cartID, itemID uuid.UUID, quantity int) error
+	RecalculateCart(cartID uuid.UUID) error
+	EmptyCart(userID string) error
+	ProcessCheckout(cart types.Cart) error
+	CreateOrder(tx *sqlx.Tx, order types.Order) error
+	CreateOrderItems(tx *sqlx.Tx, orderID, cartID uuid.UUID) error
+	ResetCartAfterCheckout(cartID uuid.UUID) error
+	GetUserID(r *http.Request) string
+	ParseAddCartParams(r *http.Request) (uuid.UUID, int, error)
+
 	Close() error
 }
 
@@ -46,6 +106,7 @@ var (
 	host       = os.Getenv("DB_HOST")
 	schema     = os.Getenv("DB_SCHEMA")
 	dbInstance *service
+	QB         = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 )
 
 func New() Service {

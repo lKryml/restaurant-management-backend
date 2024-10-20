@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -74,6 +75,10 @@ func HandleFileUpload(r *http.Request, table string) (*string, error) {
 	//saveFileMetadata(fileUUID, handler.Filename, filePath)
 
 	return &filePath, nil
+}
+
+func NewValidationError(message string) error {
+	return errors.New(message)
 }
 
 func HandleError(w http.ResponseWriter, status int, message string) {
@@ -177,4 +182,17 @@ func ParseJWT(tokenString string) (uuid.UUID, error) {
 	}
 
 	return userID, nil
+}
+
+func ParseBoolWithDefault(value string, defaultValue bool) bool {
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+
+	return parsed
 }

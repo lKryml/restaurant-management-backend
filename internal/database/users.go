@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,8 +11,6 @@ import (
 	"restaurant-management-backend/internal/logger"
 	"restaurant-management-backend/internal/types"
 )
-
-var QB = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 
 func (s *service) ListUsers() ([]types.User, error) {
 	var users []types.User
@@ -106,4 +105,21 @@ func (s *service) DeleteUser(id string) error {
 		}
 	}
 	return nil
+}
+
+func (s *service) GetRoles(user *types.User) error {
+	user.Roles = []int{}
+
+	query, args, err := QB.Select("roles.id").
+		From("roles").
+		LeftJoin("user_roles ON user_roles.role_id = roles.id").
+		LeftJoin("users ON user_roles.user_id = users.id").
+		Where(squirrel.Eq{"users.id": user.ID}).
+		OrderBy("roles.id").
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	return s.db.SelectContext(context.Background(), &user.Roles, query, args...)
 }
